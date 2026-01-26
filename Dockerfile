@@ -24,7 +24,8 @@ RUN apk add \
     snappy-dev \
     bsd-compat-headers \
     openssl-dev \
-    tzdata
+    tzdata \
+    patch
 
 RUN git clone --depth 1 --branch ${VERNEMQ_VERSION} \
       https://github.com/vernemq/vernemq.git \
@@ -34,10 +35,16 @@ RUN cd /usr/src/vernemq && \
     make rel && \
     mv _build/default/rel/vernemq /vernemq
 
-# Download config files from docker-vernemq repository
+# Download config files from docker-vernemq repository (vm.args, vernemq.sh, join_cluster.sh)
 RUN wget -O /vernemq/etc/vm.args https://github.com/vernemq/docker-vernemq/raw/${VERNEMQ_DOCKER_VERSION}/files/vm.args && \
     wget -O /vernemq/bin/vernemq.sh https://github.com/vernemq/docker-vernemq/raw/${VERNEMQ_DOCKER_VERSION}/bin/vernemq.sh && \
     wget -O /vernemq/bin/join_cluster.sh https://github.com/vernemq/docker-vernemq/raw/${VERNEMQ_DOCKER_VERSION}/bin/join_cluster.sh
+
+# Apply patch to fix config error detection
+# (upstream vernemq.sh has a bug: config errors are not detected because
+#  'vernemq config generate' always returns exit code 0)
+COPY vernemq.sh.patch /tmp/
+RUN patch -p0 /vernemq/bin/vernemq.sh < /tmp/vernemq.sh.patch && rm /tmp/vernemq.sh.patch
 
 RUN chown -R 10000:10000 /vernemq
 RUN chmod 0755 /vernemq/bin/vernemq.sh /vernemq/bin/join_cluster.sh
